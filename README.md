@@ -1,1 +1,2 @@
 # Ilantus-Tooling-Project
+A full-stack web app that takes a vendor's website URL or product description as input, uses an LLM to extract and map their capabilities to a master IAM use case library, and outputs a structured gap analysis showing what the vendor covers and what they miss. If the LLM identifies a capability not in the master library, it flags it as a new use case, queues it for human review, and appends it to the library upon approval.
