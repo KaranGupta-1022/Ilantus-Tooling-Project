@@ -104,16 +104,16 @@ requests==2.31.0
 beautifulsoup4==4.12.3
 ```
 
-- [ ] `.env` file (never commit this):
+- [x] `.env` file (never commit this):
 
 ```
 OPENAI_API_KEY=your_key_here
 DATABASE_URL=your_neon_connection_string_here
 ```
 
-- [ ] `.gitignore` additions: `venv/`, `__pycache__/`, `*.pyc`, `.env`, `node_modules/`
-- [ ] Sign up for Neon at neon.tech, create a new project, copy the connection string into `.env`
-- [ ] Sign up for OpenAI at platform.openai.com, create an API key, copy it into `.env`
+- [x] `.gitignore` additions: `venv/`, `__pycache__/`, `*.pyc`, `.env`, `node_modules/`
+- [x] Sign up for Neon at neon.tech, create a new project, copy the connection string into `.env`
+- [x] Sign up for OpenAI at platform.openai.com, create an API key, copy it into `.env`
 
 ---
 
@@ -124,11 +124,11 @@ DATABASE_URL=your_neon_connection_string_here
 This phase builds the master use case library that the LLM maps vendor capabilities
 against, and adds the tables needed to support new use case discovery and review.
 
-- [ ] Connect to your Neon database using any Postgres client (TablePlus has a free tier,
+- [x] Connect to your Neon database using any Postgres client (TablePlus has a free tier,
   ```
   or use the Neon web console)
   ```
-- [ ] `backend/schema.sql` — create the following tables:
+- [x] `backend/schema.sql` — create the following tables:
 
 ```sql
 CREATE TABLE use_cases (
@@ -179,14 +179,14 @@ CREATE TABLE pending_use_cases (
 );
 ```
 
-- [ ] `backend/seed.py` — seed the `use_cases` table with your master use case list from
+- [x] `backend/seed.py` — seed the `use_cases` table with your master use case list from
   ```
   the Ilantus project. Use the codes you already established (C1 through C12, R1
   through R9, U1 through U9, D1 through D3, GEN-1 through GEN-11). Each row should
   include the code, name, category, description, and `source = 'manual'`.
   ```
-- [ ] Run the seed script, verify rows are inserted in the Neon console
-- [ ] `backend/db.py` — a simple database connection helper using `psycopg2` and the
+- [x] Run the seed script, verify rows are inserted in the Neon console
+- [x] `backend/db.py` — a simple database connection helper using `psycopg2` and the
   ```
   `DATABASE_URL` from your `.env`
   ```
