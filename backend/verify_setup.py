@@ -7,6 +7,9 @@ load_dotenv()
 
 
 def check_env_vars():
+    """
+    Checks the environment variables are set correctly.
+    """
     required = ["GROQ_API_KEY", "DATABASE_URL"]
     placeholder_markers = ["your_", "placeholder", "changeme"]
     ok = True
@@ -26,6 +29,9 @@ def check_env_vars():
 
 
 def check_imports():
+    """
+    Checks the imports are working correctly.
+    """
     modules = ["flask", "flask_cors", "psycopg2", "openai", "requests", "bs4"]
     ok = True
 
@@ -41,6 +47,9 @@ def check_imports():
 
 
 def check_db_connection():
+    """
+    Checks the database connection is working correctly.
+    """
     database_url = os.getenv("DATABASE_URL")
     if not database_url or "your_" in database_url.lower():
         print("[SKIP] DATABASE_URL not set, skipping connection test")

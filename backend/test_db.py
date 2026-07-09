@@ -2,6 +2,13 @@ from db import get_connection
 
 
 def test_connection_and_query():
+    """
+    Tests the database connection and query.
+    - Gets a connection to the database.
+    - Executes a query to get the number of use cases.
+    - Executes a query to get the use cases.
+    - Prints the use cases.
+    """
     with get_connection() as conn:
         with conn.cursor() as cur:
             cur.execute("SELECT COUNT(*) FROM use_cases;")

@@ -11,6 +11,9 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 
 @contextmanager
 def get_connection():
+    """
+    Gets a connection to the database.
+    """
     conn = psycopg2.connect(DATABASE_URL)
     try:
         yield conn
