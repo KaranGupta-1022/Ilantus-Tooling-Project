@@ -13,6 +13,11 @@ CREATE TABLE IF NOT EXISTS vendors (
   id SERIAL PRIMARY KEY,
   name VARCHAR(100) NOT NULL,
   input_text TEXT,
+  domain_id INTEGER REFERENCES domains(id),
+  input_type VARCHAR(10),
+  -- 'url' or 'text'
+  pages_crawled INTEGER,
+  -- number of pages scraped; NULL when input_type='text'
   created_at TIMESTAMP DEFAULT NOW()
 );
 

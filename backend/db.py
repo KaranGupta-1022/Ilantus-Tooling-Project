@@ -107,6 +107,42 @@ def approve_pending_use_case(pending_id):
 
     return new_use_case_id 
 
+def update_pending_use_case(pending_id, fields):
+    """
+    Updates one or more suggested_* fields on a pending use case before approval.
+    `fields` is a dict whose keys may include: suggested_code, suggested_name,
+    suggested_category, suggested_description. Only status='pending' rows may be edited.
+    """
+    allowed_columns = {
+        "suggested_code",
+        "suggested_name",
+        "suggested_category",
+        "suggested_description",
+    }
+    updates = {k: v for k, v in fields.items() if k in allowed_columns}
+    if not updates:
+        raise ValueError("No valid fields to update")
+
+    set_clause = ", ".join(f"{col} = %s" for col in updates)
+    params = list(updates.values()) + [pending_id]
+
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                f"""
+                UPDATE pending_use_cases
+                SET {set_clause}
+                WHERE id = %s AND status = 'pending';
+                """,
+                params,
+            )
+            updated = cur.rowcount
+        conn.commit()
+
+    if updated == 0:
+        raise ValueError(f"No pending use case with id={pending_id} and status='pending'")
+        
+
 def reject_pending_use_case(pending_id):
     """
     Marks a pending use case as rejected without touching use_cases.
