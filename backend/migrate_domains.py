@@ -60,6 +60,14 @@ def migrate():
                 """
             )
 
+            # add the suggested_domain_id column to the pending_use_cases table
+            cur.execute(
+                """
+                ALTER TABLE pending_use_cases
+                ADD COLUMN IF NOT EXISTS suggested_domain_id INTEGER REFERENCES domains(id);
+                """
+            )
+
             # backfill the use_cases table with the domains
             cur.execute(
                 """

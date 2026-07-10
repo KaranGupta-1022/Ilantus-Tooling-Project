@@ -34,6 +34,8 @@ CREATE TABLE IF NOT EXISTS pending_use_cases (
   -- the vendor whose evaluation triggered the discovery
   suggested_code VARCHAR(10),
   -- LLM-suggested code, e.g. C13 or U10, may need human adjustment
+  suggested_domain_id INTEGER REFERENCES domains(id),
+  -- the IAM domain this new use case belongs to
   suggested_name VARCHAR(100) NOT NULL,
   suggested_category VARCHAR(50) NOT NULL,
   suggested_description TEXT NOT NULL,
