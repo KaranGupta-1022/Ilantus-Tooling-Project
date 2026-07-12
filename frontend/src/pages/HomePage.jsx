@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { mockDomains, mockEvaluateResponse } from '../mock/data.js'
+import { getDomains, evaluateVendor } from '../api.js'
 
 export default function HomePage() {
   const navigate = useNavigate()
@@ -12,6 +12,10 @@ export default function HomePage() {
   const [domainOpen, setDomainOpen] = useState(false)
   const domainRef = useRef(null)
 
+  const [domains, setDomains] = useState([])
+  const [domainsError, setDomainsError] = useState(null)
+  const [submitError, setSubmitError] = useState(null)
+
   useEffect(() => {
     function handleClickOutside(e) {
       if (domainRef.current && !domainRef.current.contains(e.target)) {
@@ -22,31 +26,41 @@ export default function HomePage() {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
-  function handleSubmit(e) {
+  useEffect(() => {
+    getDomains()
+      .then((data) => setDomains(data))
+      .catch((err) => setDomainsError(err.message))
+  }, [])
+
+  async function handleSubmit(e) {
     e.preventDefault()
-    if (!vendorName.trim() || !inputValue.trim()) return
+    setSubmitError(null)
+    if (!vendorName.trim() || !inputValue.trim()) {
+      setSubmitError('Vendor name and content are both required.')
+      return
+    }
 
-    setLoadingStage('crawling')
+    setLoadingStage(inputType === 'url' ? 'crawling' : 'evaluating')
 
-    setTimeout(() => {
-      setLoadingStage('evaluating')
+    let stageTimer = null
+    if (inputType === 'url') {
+      stageTimer = setTimeout(() => setLoadingStage('evaluating'), 4000)
+    }
 
-      setTimeout(() => {
-        navigate('/results', {
-          state: {
-            result: {
-              ...mockEvaluateResponse,
-              vendor: {
-                ...mockEvaluateResponse.vendor,
-                name: vendorName,
-                domain_code: domainCode,
-                input_type: inputType,
-              },
-            },
-          },
-        })
-      }, 1500)
-    }, 1500)
+    try {
+      const result = await evaluateVendor({
+        vendor_name: vendorName,
+        input_type: inputType,
+        input_value: inputValue,
+        domain_code: domainCode,
+      })
+      navigate('/results', { state: { result } })
+    } catch (err) {
+      setSubmitError(err.message)
+    } finally {
+      if (stageTimer) clearTimeout(stageTimer)
+      setLoadingStage(null)
+    }
   }
 
   return (
@@ -83,7 +97,7 @@ export default function HomePage() {
               </button>
               {domainOpen && (
                 <ul className="dropdown-menu">
-                  {mockDomains.map((d) => (
+                  {domains.map((d) => (
                     <li key={d.code}>
                       <button
                         type="button"
@@ -102,6 +116,11 @@ export default function HomePage() {
                 </ul>
               )}
             </div>
+            {domainsError && (
+              <span className="field-hint" style={{ color: '#b91c1c' }}>
+                Failed to load domains: {domainsError}
+              </span>
+            )}
           </div>
 
           <div className="form-group">
@@ -152,6 +171,12 @@ export default function HomePage() {
           <button type="submit" className="btn-primary" disabled={loadingStage !== null}>
             Evaluate
           </button>
+
+          {submitError && (
+            <div className="field-hint" style={{ color: '#b91c1c', marginTop: '0.5rem' }}>
+              {submitError}
+            </div>
+          )}
 
           {loadingStage && (
             <div className="loading-box">

@@ -1,5 +1,4 @@
 import { useLocation } from 'react-router-dom'
-import { mockEvaluateResponse } from '../mock/data.js'
 import ScrollBox from '../components/ScrollBox.jsx'
 
 function buildCategoryBreakdown(mapping) {
@@ -18,18 +17,31 @@ function buildCategoryBreakdown(mapping) {
   }))
 }
 
+function formatConfidence(confidence) {
+  return confidence == null ? '—' : `${Math.round(confidence * 100)}%`
+}
+
 export default function ResultsPage() {
   const location = useLocation()
-  const result = location.state?.result ?? mockEvaluateResponse
+  const result = location.state?.result
+
+  if (!result) {
+    return (
+      <div className="card">
+        <p>No results to show. Run an evaluation from the Home page first.</p>
+      </div>
+    )
+  }
+
   const { vendor, mapping, new_use_cases_found: newUseCases } = result
 
   const coveredCount = mapping.filter((m) => m.covered).length
   const totalCount = mapping.length
-  const coveredPercent = Math.round((coveredCount / totalCount) * 100)
+  const coveredPercent = totalCount === 0 ? 0 : Math.round((coveredCount / totalCount) * 100)
   const categories = buildCategoryBreakdown(mapping)
 
   function handleExport() {
-    alert('Export to CSV will be implemented in Phase 7.')
+    alert('Export to CSV will be implemented in Phase 8.')
   }
 
   return (
@@ -40,11 +52,9 @@ export default function ResultsPage() {
           <p className="page-subtitle">
             Domain: {vendor.domain_code}
             {vendor.input_type === 'url' && vendor.pages_crawled != null && (
-              <>
-                {' '}· Pages Crawled: {vendor.pages_crawled}
-                {vendor.word_count != null && <> · Word Count: {vendor.word_count.toLocaleString()}</>}
-              </>
+              <> · Pages Crawled: {vendor.pages_crawled}</>
             )}
+            {vendor.word_count != null && <> · Word Count: {vendor.word_count.toLocaleString()}</>}
           </p>
         </div>
         <button className="btn-primary" onClick={handleExport}>
@@ -109,8 +119,8 @@ export default function ResultsPage() {
                       <span className="icon-badge icon-badge-not-covered">✕</span>
                     )}
                   </td>
-                  <td>{item.covered ? `${item.confidence}%` : '—'}</td>
-                  <td className="reasoning-cell">{item.covered ? item.reasoning : '—'}</td>
+                  <td>{formatConfidence(item.confidence)}</td>
+                  <td className="reasoning-cell">{item.reasoning ?? '—'}</td>
                 </tr>
               ))}
             </tbody>
@@ -135,8 +145,8 @@ export default function ResultsPage() {
                   <div className="new-use-case-title">
                     {uc.suggested_code} — {uc.suggested_name}
                   </div>
-                  <div className="new-use-case-desc">{uc.description}</div>
-                  <div className="new-use-case-reasoning">{uc.reasoning}</div>
+                  <div className="new-use-case-desc">{uc.suggested_description}</div>
+                  <div className="new-use-case-reasoning">{uc.llm_reasoning}</div>
                 </li>
               ))}
             </ul>

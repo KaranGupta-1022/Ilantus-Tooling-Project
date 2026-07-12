@@ -1,13 +1,29 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { mockDomains, mockMasterLibrary, mockPendingUseCases } from '../mock/data.js'
+import {
+  getDomains,
+  getUseCases,
+  getPendingUseCases,
+  updatePendingUseCase,
+  approvePendingUseCase,
+  rejectPendingUseCase,
+} from '../api.js'
 import ScrollBox from '../components/ScrollBox.jsx'
 
 const PAGE_SIZE = 6
 
 export default function LibraryPage() {
   const [activeTab, setActiveTab] = useState('master')
-  const [masterList, setMasterList] = useState(mockMasterLibrary)
-  const [pendingList, setPendingList] = useState(mockPendingUseCases)
+  const [domains, setDomains] = useState([])
+
+  const [masterList, setMasterList] = useState([])
+  const [masterLoading, setMasterLoading] = useState(true)
+  const [masterError, setMasterError] = useState(null)
+
+  const [pendingList, setPendingList] = useState([])
+  const [pendingLoading, setPendingLoading] = useState(true)
+  const [pendingError, setPendingError] = useState(null)
+  const [actionLoadingId, setActionLoadingId] = useState(null)
+  const [actionError, setActionError] = useState(null)
 
   const [search, setSearch] = useState('')
   const [domainFilter, setDomainFilter] = useState('ALL')
@@ -36,16 +52,67 @@ export default function LibraryPage() {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
+  useEffect(() => {
+    getDomains()
+      .then(setDomains)
+      .catch(() => {})
+  }, [])
+
+  async function loadMaster() {
+    setMasterLoading(true)
+    setMasterError(null)
+    try {
+      if (domainFilter === 'ALL') {
+        const results = await Promise.all(
+          domains.map((d) =>
+            getUseCases(d.code).then((items) => items.map((i) => ({ ...i, domain_code: d.code })))
+          )
+        )
+        setMasterList(results.flat())
+      } else {
+        const items = await getUseCases(domainFilter)
+        setMasterList(items.map((i) => ({ ...i, domain_code: domainFilter })))
+      }
+    } catch (err) {
+      setMasterError(err.message)
+    } finally {
+      setMasterLoading(false)
+    }
+  }
+
+  async function loadPending() {
+    setPendingLoading(true)
+    setPendingError(null)
+    try {
+      const items = await getPendingUseCases(pendingDomainFilter === 'ALL' ? undefined : pendingDomainFilter)
+      setPendingList(items)
+    } catch (err) {
+      setPendingError(err.message)
+    } finally {
+      setPendingLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    if (domains.length === 0 && domainFilter === 'ALL') return
+    loadMaster()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [domainFilter, domains])
+
+  useEffect(() => {
+    loadPending()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingDomainFilter])
+
   const filteredMaster = useMemo(() => {
     return masterList.filter((uc) => {
-      const matchesDomain = domainFilter === 'ALL' || uc.domain_code === domainFilter
       const matchesSearch =
         search.trim() === '' ||
         uc.name.toLowerCase().includes(search.toLowerCase()) ||
         uc.code.toLowerCase().includes(search.toLowerCase())
-      return matchesDomain && matchesSearch
+      return matchesSearch
     })
-  }, [masterList, search, domainFilter])
+  }, [masterList, search])
 
   useEffect(() => {
     setPage(1)
@@ -58,18 +125,18 @@ export default function LibraryPage() {
 
   const filteredPending = useMemo(() => {
     return pendingList.filter((uc) => {
-      const matchesDomain = pendingDomainFilter === 'ALL' || uc.domain_code === pendingDomainFilter
       const matchesSearch =
         pendingSearch.trim() === '' ||
         uc.suggested_name.toLowerCase().includes(pendingSearch.toLowerCase()) ||
         uc.suggested_code.toLowerCase().includes(pendingSearch.toLowerCase())
-      return matchesDomain && matchesSearch
+      return matchesSearch
     })
-  }, [pendingList, pendingSearch, pendingDomainFilter])
+  }, [pendingList, pendingSearch])
 
   function startEdit(item) {
     setEditingId(item.id)
     setEditDraft({ ...item })
+    setActionError(null)
   }
 
   function cancelEdit() {
@@ -77,35 +144,55 @@ export default function LibraryPage() {
     setEditDraft(null)
   }
 
-  function saveEdit() {
-    setPendingList((list) =>
-      list.map((item) => (item.id === editDraft.id ? { ...editDraft } : item))
-    )
-    setEditingId(null)
-    setEditDraft(null)
+  async function saveEdit() {
+    setActionLoadingId(editDraft.id)
+    setActionError(null)
+    try {
+      await updatePendingUseCase(editDraft.id, {
+        suggested_code: editDraft.suggested_code,
+        suggested_name: editDraft.suggested_name,
+        suggested_description: editDraft.suggested_description,
+        domain_code: editDraft.domain_code,
+      })
+      setPendingList((list) =>
+        list.map((item) => (item.id === editDraft.id ? { ...editDraft } : item))
+      )
+      setEditingId(null)
+      setEditDraft(null)
+    } catch (err) {
+      setActionError(err.message)
+    } finally {
+      setActionLoadingId(null)
+    }
   }
 
-  function approve(item) {
-    const approvedItem = editingId === item.id ? editDraft : item
-    setMasterList((list) => [
-      ...list,
-      {
-        id: Date.now(),
-        code: approvedItem.suggested_code,
-        name: approvedItem.suggested_name,
-        category: approvedItem.category,
-        description: approvedItem.description,
-        domain_code: approvedItem.domain_code,
-        source: 'llm_approved',
-      },
-    ])
-    setPendingList((list) => list.filter((p) => p.id !== item.id))
-    if (editingId === item.id) cancelEdit()
+  async function approve(item) {
+    setActionLoadingId(item.id)
+    setActionError(null)
+    try {
+      await approvePendingUseCase(item.id)
+      setPendingList((list) => list.filter((p) => p.id !== item.id))
+      if (editingId === item.id) cancelEdit()
+      loadMaster()
+    } catch (err) {
+      setActionError(err.message)
+    } finally {
+      setActionLoadingId(null)
+    }
   }
 
-  function reject(item) {
-    setPendingList((list) => list.filter((p) => p.id !== item.id))
-    if (editingId === item.id) cancelEdit()
+  async function reject(item) {
+    setActionLoadingId(item.id)
+    setActionError(null)
+    try {
+      await rejectPendingUseCase(item.id)
+      setPendingList((list) => list.filter((p) => p.id !== item.id))
+      if (editingId === item.id) cancelEdit()
+    } catch (err) {
+      setActionError(err.message)
+    } finally {
+      setActionLoadingId(null)
+    }
   }
 
   return (
@@ -162,7 +249,7 @@ export default function LibraryPage() {
                       All Domains
                     </button>
                   </li>
-                  {mockDomains.map((d) => (
+                  {domains.map((d) => (
                     <li key={d.code}>
                       <button
                         type="button"
@@ -183,8 +270,14 @@ export default function LibraryPage() {
             </div>
           </div>
 
+          {masterError && (
+            <p className="field-hint" style={{ color: '#b91c1c' }}>
+              {masterError}
+            </p>
+          )}
+
           <ScrollBox maxHeight={420} wrapClassName="results-table-scroll">
-            <table className="results-table">
+            <table className="results-table library-table">
               <thead>
                 <tr>
                   <th>Code</th>
@@ -196,25 +289,33 @@ export default function LibraryPage() {
                 </tr>
               </thead>
               <tbody>
-                {paginatedMaster.map((uc) => (
-                  <tr key={uc.id}>
-                    <td>{uc.code}</td>
-                    <td>{uc.name}</td>
-                    <td>{uc.category}</td>
-                    <td className="reasoning-cell">{uc.description}</td>
-                    <td>{uc.domain_code}</td>
-                    <td>
-                      <span
-                        className={
-                          uc.source === 'manual' ? 'badge-source-manual' : 'badge-source-llm'
-                        }
-                      >
-                        {uc.source === 'manual' ? 'Manual' : 'LLM'}
-                      </span>
+                {masterLoading && (
+                  <tr>
+                    <td colSpan={6} className="empty-state">
+                      Loading…
                     </td>
                   </tr>
-                ))}
-                {filteredMaster.length === 0 && (
+                )}
+                {!masterLoading &&
+                  paginatedMaster.map((uc) => (
+                    <tr key={uc.id}>
+                      <td>{uc.code}</td>
+                      <td>{uc.name}</td>
+                      <td>{uc.category}</td>
+                      <td className="reasoning-cell">{uc.description}</td>
+                      <td>{uc.domain_code}</td>
+                      <td>
+                        <span
+                          className={
+                            uc.source === 'manual' ? 'badge-source-manual' : 'badge-source-llm'
+                          }
+                        >
+                          {uc.source === 'manual' ? 'Manual' : 'LLM'}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                {!masterLoading && filteredMaster.length === 0 && (
                   <tr>
                     <td colSpan={6} className="empty-state">
                       No use cases match your search/filter.
@@ -225,7 +326,7 @@ export default function LibraryPage() {
             </table>
           </ScrollBox>
 
-          {filteredMaster.length > 0 && (
+          {!masterLoading && filteredMaster.length > 0 && (
             <div className="pagination-row">
               <span>
                 Showing {pageStart + 1} to {Math.min(pageStart + PAGE_SIZE, filteredMaster.length)} of{' '}
@@ -295,7 +396,7 @@ export default function LibraryPage() {
                       All Domains
                     </button>
                   </li>
-                  {mockDomains.map((d) => (
+                  {domains.map((d) => (
                     <li key={d.code}>
                       <button
                         type="button"
@@ -317,104 +418,113 @@ export default function LibraryPage() {
             </div>
           </div>
 
+          {(pendingError || actionError) && (
+            <p className="field-hint" style={{ color: '#b91c1c' }}>
+              {pendingError || actionError}
+            </p>
+          )}
+
           <ScrollBox maxHeight={420} wrapClassName="pending-list-scroll">
             <div className="pending-list">
-              {filteredPending.length === 0 && (
+              {pendingLoading && <p className="empty-state">Loading…</p>}
+              {!pendingLoading && filteredPending.length === 0 && (
                 <p className="empty-state">No pending use cases match your search/filter.</p>
               )}
-              {filteredPending.map((item) => {
-                const isEditing = editingId === item.id
-                return (
-                  <div className="pending-card" key={item.id}>
-                    <div className="pending-icon-col">
-                      <span className="icon-badge-new">🕐</span>
-                      <span className="badge-new">New</span>
-                    </div>
+              {!pendingLoading &&
+                filteredPending.map((item) => {
+                  const isEditing = editingId === item.id
+                  const isBusy = actionLoadingId === item.id
+                  return (
+                    <div className="pending-card" key={item.id}>
+                      <div className="pending-icon-col">
+                        <span className="icon-badge-new">🕐</span>
+                        <span className="badge-new">New</span>
+                      </div>
 
-                    <div className="pending-content">
-                      {isEditing ? (
-                        <div className="pending-edit-form">
-                          <div className="form-group">
-                            <label>Code</label>
-                            <input
-                              value={editDraft.suggested_code}
-                              onChange={(e) =>
-                                setEditDraft({ ...editDraft, suggested_code: e.target.value })
-                              }
-                            />
+                      <div className="pending-content">
+                        {isEditing ? (
+                          <div className="pending-edit-form">
+                            <div className="form-group">
+                              <label>Code</label>
+                              <input
+                                value={editDraft.suggested_code}
+                                onChange={(e) =>
+                                  setEditDraft({ ...editDraft, suggested_code: e.target.value })
+                                }
+                              />
+                            </div>
+                            <div className="form-group">
+                              <label>Name</label>
+                              <input
+                                value={editDraft.suggested_name}
+                                onChange={(e) =>
+                                  setEditDraft({ ...editDraft, suggested_name: e.target.value })
+                                }
+                              />
+                            </div>
+                            <div className="form-group">
+                              <label>Description</label>
+                              <textarea
+                                rows={2}
+                                value={editDraft.suggested_description}
+                                onChange={(e) =>
+                                  setEditDraft({ ...editDraft, suggested_description: e.target.value })
+                                }
+                              />
+                            </div>
+                            <div className="form-group">
+                              <label>Domain</label>
+                              <select
+                                value={editDraft.domain_code}
+                                onChange={(e) =>
+                                  setEditDraft({ ...editDraft, domain_code: e.target.value })
+                                }
+                              >
+                                {domains.map((d) => (
+                                  <option key={d.code} value={d.code}>
+                                    {d.code}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
                           </div>
-                          <div className="form-group">
-                            <label>Name</label>
-                            <input
-                              value={editDraft.suggested_name}
-                              onChange={(e) =>
-                                setEditDraft({ ...editDraft, suggested_name: e.target.value })
-                              }
-                            />
-                          </div>
-                          <div className="form-group">
-                            <label>Description</label>
-                            <textarea
-                              rows={2}
-                              value={editDraft.description}
-                              onChange={(e) =>
-                                setEditDraft({ ...editDraft, description: e.target.value })
-                              }
-                            />
-                          </div>
-                          <div className="form-group">
-                            <label>Domain</label>
-                            <select
-                              value={editDraft.domain_code}
-                              onChange={(e) =>
-                                setEditDraft({ ...editDraft, domain_code: e.target.value })
-                              }
-                            >
-                              {mockDomains.map((d) => (
-                                <option key={d.code} value={d.code}>
-                                  {d.code}
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-                        </div>
-                      ) : (
-                        <>
-                          <div className="new-use-case-title">{item.suggested_name}</div>
-                          <div className="new-use-case-desc">{item.description}</div>
-                          <div className="field-hint">
-                            Discovered on {item.discovered_pages}{' '}
-                            {item.discovered_pages === 1 ? 'page' : 'pages'}
-                          </div>
-                        </>
-                      )}
-                    </div>
+                        ) : (
+                          <>
+                            <div className="new-use-case-title">
+                              {item.suggested_code} — {item.suggested_name}
+                              <span className="field-hint"> · {item.suggested_category} · {item.domain_code}</span>
+                            </div>
+                            <div className="new-use-case-desc">{item.suggested_description}</div>
+                            <div className="new-use-case-reasoning">{item.llm_reasoning}</div>
+                          </>
+                        )}
+                      </div>
 
-                    <div className="pending-card-actions">
-                      {isEditing ? (
-                        <>
-                          <button className="btn-secondary" onClick={saveEdit}>
-                            Save
+                      <div className="pending-card-actions">
+                        {isEditing ? (
+                          <>
+                            <button className="btn-secondary" onClick={saveEdit} disabled={isBusy}>
+                              {isBusy ? 'Saving…' : 'Save'}
+                            </button>
+                            <button className="btn-secondary" onClick={cancelEdit} disabled={isBusy}>
+                              Cancel
+                            </button>
+                          </>
+                        ) : (
+                          <button className="btn-edit-outline" onClick={() => startEdit(item)} disabled={isBusy}>
+                            Edit
                           </button>
-                          <button className="btn-secondary" onClick={cancelEdit}>
-                            Cancel
-                          </button>
-                        </>
-                      ) : (
-                        <button className="btn-edit-outline" onClick={() => startEdit(item)}>
-                          Edit
+                        )}
+                        <button className="btn-approve" onClick={() => approve(item)} disabled={isBusy}>
+                          {isBusy ? '…' : 'Approve'}
                         </button>
-                      )}
-                      <button className="btn-approve" onClick={() => approve(item)}>
-                        Approve
-                      </button>
-                      <button className="btn-reject" onClick={() => reject(item)}>
-                        Reject
-                      </button>
+                        <button className="btn-reject" onClick={() => reject(item)} disabled={isBusy}>
+                          {isBusy ? '…' : 'Reject'}
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                )
-              })}
+                  )
+                })}
             </div>
           </ScrollBox>
         </div>

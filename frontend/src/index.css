@@ -690,6 +690,10 @@ h1 {
   white-space: nowrap;
 }
 
+.library-table {
+  min-width: 760px;
+}
+
 .domain-chip-trigger {
   width: auto;
   display: inline-flex;

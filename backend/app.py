@@ -143,6 +143,20 @@ def evaluate():
         with conn.cursor() as cur:
             cur.execute(
                 """
+                SELECT id FROM vendors
+                WHERE domain_id = %s AND LOWER(name) = LOWER(%s);
+                """,
+                (domain_id, vendor_name),
+            )
+            existing = cur.fetchone()
+            if existing is not None:
+                old_vendor_id = existing[0]
+                cur.execute("DELETE FROM evaluations WHERE vendor_id = %s;", (old_vendor_id,))
+                cur.execute("DELETE FROM pending_use_cases WHERE vendor_id = %s;", (old_vendor_id,))
+                cur.execute("DELETE FROM vendors WHERE id = %s;", (old_vendor_id,))
+
+            cur.execute(
+                """
                 INSERT INTO vendors (name, input_text, domain_id, input_type, pages_crawled)
                 VALUES (%s, %s, %s, %s, %s)
                 RETURNING id, created_at;
@@ -181,7 +195,7 @@ def evaluate():
                 match = covered_by_code.get(code)
                 covered = match is not None
                 confidence = match["confidence"] if covered else None
-                reasoning = None
+                reasoning = match.get("reasoning") if covered else None
 
                 cur.execute(
                     """
@@ -213,6 +227,7 @@ def evaluate():
                 "domain_code": domain_code,
                 "input_type": input_type,
                 "pages_crawled": pages_crawled,
+                "word_count": len(vendor_text.split()),
                 "created_at": created_at.isoformat(),
             },
             "mapping": reconciled,
@@ -225,15 +240,21 @@ def list_vendors():
     domain_code = request.args.get("domain")
 
     query = """
-        SELECT v.id, v.name, v.input_type, v.pages_crawled, v.created_at, d.code
+        SELECT v.id, v.name, v.input_type, v.pages_crawled, v.created_at, d.code,
+               COUNT(e.id) AS use_cases_total,
+               COALESCE(SUM(CASE WHEN e.covered THEN 1 ELSE 0 END), 0) AS use_cases_covered
         FROM vendors v
         JOIN domains d ON v.domain_id = d.id
+        LEFT JOIN evaluations e ON e.vendor_id = v.id
     """
     params = ()
     if domain_code:
         query += " WHERE d.code = %s"
         params = (domain_code,)
-    query += " ORDER BY v.created_at DESC;"
+    query += """
+        GROUP BY v.id, v.name, v.input_type, v.pages_crawled, v.created_at, d.code
+        ORDER BY v.created_at DESC;
+    """
 
     with get_connection() as conn:
         with conn.cursor() as cur:
@@ -248,6 +269,9 @@ def list_vendors():
             "pages_crawled": row[3],
             "created_at": row[4].isoformat(),
             "domain_code": row[5],
+            "use_cases_total": row[6],
+            "use_cases_covered": row[7],
+            "coverage": round(row[7] / row[6] * 100) if row[6] else 0,
         }
         for row in rows
     ]
@@ -284,6 +308,18 @@ def get_vendor(vendor_id):
             )
             eval_rows = cur.fetchall()
 
+            cur.execute(
+                """
+                SELECT id, suggested_code, suggested_name, suggested_category,
+                       suggested_description, llm_reasoning, status
+                FROM pending_use_cases
+                WHERE vendor_id = %s AND status = 'pending'
+                ORDER BY id;
+                """,
+                (vendor_id,),
+            )
+            pending_rows = cur.fetchall()
+
     vendor = {
         "id": vendor_row[0],
         "name": vendor_row[1],
@@ -302,6 +338,17 @@ def get_vendor(vendor_id):
                 "reasoning": row[6],
             }
             for row in eval_rows
+        ],
+        "new_use_cases_found": [
+            {
+                "id": row[0],
+                "suggested_code": row[1],
+                "suggested_name": row[2],
+                "suggested_category": row[3],
+                "suggested_description": row[4],
+                "llm_reasoning": row[5],
+            }
+            for row in pending_rows
         ],
     }
     return jsonify(vendor)
@@ -408,6 +455,17 @@ def patch_pending(pending_id):
     body = request.get_json(silent=True) or {}
     if not body:
         return jsonify({"error": "Request body must include at least one field to update"}), 400
+
+    if "domain_code" in body:
+        domain_code = (body.pop("domain_code") or "").strip()
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT id FROM domains WHERE code = %s;", (domain_code,))
+                domain_row = cur.fetchone()
+        if domain_row is None:
+            return jsonify({"error": f"Unknown domain code '{domain_code}'"}), 400
+        body["suggested_domain_id"] = domain_row[0]
+
     try:
         update_pending_use_case(pending_id, body)
     except ValueError as exc:

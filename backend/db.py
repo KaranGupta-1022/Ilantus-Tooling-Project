@@ -118,7 +118,9 @@ def update_pending_use_case(pending_id, fields):
         "suggested_name",
         "suggested_category",
         "suggested_description",
+        "suggested_domain_id",
     }
+    
     updates = {k: v for k, v in fields.items() if k in allowed_columns}
     if not updates:
         raise ValueError("No valid fields to update")

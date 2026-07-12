@@ -1,10 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { mockCompareResponse, mockDomains, mockVendors } from '../mock/data.js'
+import { getDomains, getVendors, compareVendors } from '../api.js'
 import ScrollBox from '../components/ScrollBox.jsx'
-
-const compareableVendors = mockVendors.filter((v) =>
-  mockCompareResponse.vendors.some((cv) => cv.id === v.id)
-)
 
 export default function ComparePage() {
   const [domainCode, setDomainCode] = useState('IGA')
@@ -12,7 +8,16 @@ export default function ComparePage() {
   const domainRef = useRef(null)
   const [addVendorOpen, setAddVendorOpen] = useState(false)
   const addVendorRef = useRef(null)
-  const [selectedIds, setSelectedIds] = useState([101, 102, 103])
+  const [selectedIds, setSelectedIds] = useState([])
+
+  const [domains, setDomains] = useState([])
+  const [vendorsInDomain, setVendorsInDomain] = useState([])
+  const [vendorsLoading, setVendorsLoading] = useState(true)
+  const [vendorsError, setVendorsError] = useState(null)
+
+  const [compareData, setCompareData] = useState(null)
+  const [compareLoading, setCompareLoading] = useState(false)
+  const [compareError, setCompareError] = useState(null)
 
   useEffect(() => {
     function handleClickOutside(e) {
@@ -27,16 +32,39 @@ export default function ComparePage() {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
-  const vendorsInDomain = useMemo(
-    () => compareableVendors.filter((v) => v.domain_code === domainCode),
-    [domainCode]
-  )
+  useEffect(() => {
+    getDomains()
+      .then(setDomains)
+      .catch(() => {})
+  }, [])
 
   useEffect(() => {
-    setSelectedIds((prev) =>
-      prev.filter((id) => vendorsInDomain.some((v) => v.id === id))
-    )
-  }, [domainCode, vendorsInDomain])
+    setVendorsLoading(true)
+    setVendorsError(null)
+    setSelectedIds([])
+    getVendors(domainCode)
+      .then(setVendorsInDomain)
+      .catch((err) => setVendorsError(err.message))
+      .finally(() => setVendorsLoading(false))
+  }, [domainCode])
+
+  useEffect(() => {
+    if (selectedIds.length < 2) {
+      setCompareData(null)
+      return
+    }
+    setCompareLoading(true)
+    setCompareError(null)
+    compareVendors(selectedIds)
+      .then(setCompareData)
+      .catch((err) => setCompareError(err.message))
+      .finally(() => setCompareLoading(false))
+  }, [selectedIds])
+
+  const selectedVendorMeta = useMemo(
+    () => selectedIds.map((id) => vendorsInDomain.find((v) => v.id === id)).filter(Boolean),
+    [selectedIds, vendorsInDomain]
+  )
 
   const availableToAdd = vendorsInDomain.filter((v) => !selectedIds.includes(v.id))
 
@@ -49,19 +77,11 @@ export default function ComparePage() {
     setSelectedIds(selectedIds.filter((sid) => sid !== id))
   }
 
-  const selectedVendors = useMemo(
-    () =>
-      selectedIds
-        .map((id) => mockCompareResponse.vendors.find((v) => v.id === id))
-        .filter(Boolean),
-    [selectedIds]
-  )
-
   const useCaseRows = useMemo(() => {
-    if (selectedVendors.length === 0) return []
-    const first = selectedVendors[0].mapping
+    if (!compareData || compareData.vendors.length === 0) return []
+    const first = compareData.vendors[0].mapping
     return first.map((item) => {
-      const perVendor = selectedVendors.map((v) =>
+      const perVendor = compareData.vendors.map((v) =>
         v.mapping.find((m) => m.use_case_code === item.use_case_code)
       )
       const coveredValues = new Set(perVendor.map((m) => m?.covered ?? false))
@@ -73,7 +93,7 @@ export default function ComparePage() {
         differs: coveredValues.size > 1,
       }
     })
-  }, [selectedVendors])
+  }, [compareData])
 
   return (
     <div>
@@ -95,7 +115,7 @@ export default function ComparePage() {
             </button>
             {domainOpen && (
               <ul className="dropdown-menu">
-                {mockDomains.map((d) => (
+                {domains.map((d) => (
                   <li key={d.code}>
                     <button
                       type="button"
@@ -120,7 +140,7 @@ export default function ComparePage() {
           Select vendors to compare
         </label>
         <div className="compare-chip-row">
-          {selectedVendors.map((v) => (
+          {selectedVendorMeta.map((v) => (
             <span className="compare-chip" key={v.id}>
               {v.name}
               <button
@@ -163,16 +183,30 @@ export default function ComparePage() {
             </div>
           )}
         </div>
-        {vendorsInDomain.length === 0 && (
+        {vendorsLoading && <p className="field-hint" style={{ marginTop: 8 }}>Loading vendors…</p>}
+        {vendorsError && (
+          <p className="field-hint" style={{ marginTop: 8, color: '#b91c1c' }}>
+            {vendorsError}
+          </p>
+        )}
+        {!vendorsLoading && !vendorsError && vendorsInDomain.length === 0 && (
           <p className="field-hint" style={{ marginTop: 8 }}>
             No evaluated vendors in this domain yet.
           </p>
         )}
       </div>
 
-      {selectedVendors.length < 2 ? (
+      {selectedIds.length < 2 ? (
         <div className="card" style={{ marginTop: 24 }}>
           <p className="empty-state">Select at least 2 vendors to compare.</p>
+        </div>
+      ) : compareError ? (
+        <div className="card" style={{ marginTop: 24, color: '#b91c1c' }}>
+          {compareError}
+        </div>
+      ) : compareLoading || !compareData ? (
+        <div className="card" style={{ marginTop: 24 }}>
+          <p className="empty-state">Loading comparison…</p>
         </div>
       ) : (
         <div className="card" style={{ marginTop: 24 }}>
@@ -181,7 +215,7 @@ export default function ComparePage() {
               <thead>
                 <tr>
                   <th>Use Case</th>
-                  {selectedVendors.map((v) => (
+                  {compareData.vendors.map((v) => (
                     <th key={v.id}>{v.name}</th>
                   ))}
                 </tr>
@@ -191,7 +225,7 @@ export default function ComparePage() {
                   <tr key={row.code} className={row.differs ? 'row-diff' : ''}>
                     <td>{row.name}</td>
                     {row.perVendor.map((m, idx) => (
-                      <td key={selectedVendors[idx].id}>
+                      <td key={compareData.vendors[idx].id}>
                         {m?.covered ? (
                           <span className="icon-badge icon-badge-covered">✓</span>
                         ) : (

@@ -108,11 +108,14 @@ Vendor text:
 {vendor_text}
 
 Return a JSON array containing ONLY the use cases the vendor's product covers (skip any not covered). Each object:
-{{"use_case_code": str, "name": str, "confidence": float}}
+{{"use_case_code": str, "name": str, "confidence": float, "reasoning": str}}
 
 Rules:
 - Evidence-based only. Generic phrases like "automates identity governance" do not count as evidence for any specific use case.
 - confidence: 0.9-1.0 for an explicit match, 0.6-0.8 for a strong implication. Only include a use case if confidence >= 0.6.
+- reasoning: one short sentence (max 15 words) citing the specific evidence from the vendor text that supports this match.
+- Each use_case_code must appear AT MOST ONCE in the array. Never repeat a use case you have already included.
+- Stop once you have evaluated every use case in the list above. Do not restate or re-evaluate use cases already covered.
 - JSON array only. No markdown, no preamble. If nothing is covered, return [].
 """
 
