@@ -13,14 +13,14 @@ const api = axios.create({
 })
 
 // Normalizes all failures to an Error whose message is the backend's
-// {"error": "..."} body when present, so callers can just read err.message.
+// {"error": "..."} body (plus "suggestion" when present, e.g. paste-text
+// hints on crawl failures) when present, so callers can just read err.message.
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    const message =
-      error.response?.data?.error ||
-      error.message ||
-      'An unexpected error occurred'
+    const data = error.response?.data
+    const base = data?.error || error.message || 'An unexpected error occurred'
+    const message = data?.suggestion ? `${base} ${data.suggestion}` : base
     return Promise.reject(new Error(message))
   }
 )

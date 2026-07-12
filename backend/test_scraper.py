@@ -1,6 +1,6 @@
 from scraper import crawl_vendor_site
 
-TEST_URL = "https://opnova.ai/"
+TEST_URL = "https://www.sailpoint.com/"
 
 if __name__ == "__main__":
     """

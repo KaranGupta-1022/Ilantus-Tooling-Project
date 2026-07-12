@@ -13,8 +13,14 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 def get_connection():
     """
     Gets a connection to the database.
+    Pins the session timezone to UTC explicitly rather than relying on
+    Neon's default, since app.py's to_utc_iso() assumes every TIMESTAMP
+    (no tz) column was written in UTC.
     """
     conn = psycopg2.connect(DATABASE_URL)
+    with conn.cursor() as cur:
+        cur.execute("SET TIME ZONE 'UTC';")
+    conn.commit()
     try:
         yield conn
     finally:

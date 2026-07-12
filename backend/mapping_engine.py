@@ -85,13 +85,27 @@ class MappingEngine:
         return f"{category_prefix}{max_number + 1}"
 
 
+    def _call_llm(self, prompt):
+        response = self.client.chat.completions.create(
+            model=MODEL,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.2,
+        )
+        return response.choices[0].message.content.strip()
+
+    def _parse_json_array(self, raw_output):
+        try:
+            return json.loads(raw_output)
+        except json.JSONDecodeError:
+            return None
+
     def _run_mapping(self, vendor_text, use_cases, domain_name):
         """
         - Runs the mapping engine for a given vendor text and use cases.
         - Returns a list of use cases that are covered by the vendor text in the form of a JSON array.
         - Creates a list of use cases.
         - Creates a prompt for the mapping engine.
-        - Runs the mapping engine.
+        - Runs the mapping engine, retrying once if the response isn't valid JSON.
         - Returns the result of the mapping engine.
         """
         use_case_list = "\n".join(
@@ -119,20 +133,22 @@ Rules:
 - JSON array only. No markdown, no preamble. If nothing is covered, return [].
 """
 
-        response = self.client.chat.completions.create(
-            model=MODEL,
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.2,
-        )
+        raw_output = self._call_llm(prompt)
+        parsed = self._parse_json_array(raw_output)
+        if parsed is not None:
+            return parsed
 
-        raw_output = response.choices[0].message.content.strip()
+        print("Failed to parse mapping response as JSON. Retrying once. Raw output:")
+        print(raw_output)
 
-        try:
-            return json.loads(raw_output)
-        except json.JSONDecodeError:
-            print("Failed to parse mapping response as JSON. Raw output:")
-            print(raw_output)
-            return {"error": "Failed to parse LLM response", "raw_output": raw_output}
+        raw_output = self._call_llm(prompt)
+        parsed = self._parse_json_array(raw_output)
+        if parsed is not None:
+            return parsed
+
+        print("Mapping retry also failed to parse as JSON. Raw output:")
+        print(raw_output)
+        return {"error": "Failed to parse LLM response", "raw_output": raw_output}
 
 
     def _run_discovery(self, vendor_text, use_cases, vendor_id, domain_code):

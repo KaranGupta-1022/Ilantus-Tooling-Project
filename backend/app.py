@@ -1,4 +1,5 @@
 import os
+from datetime import timezone
 
 from dotenv import load_dotenv
 from flask import Flask, jsonify, request
@@ -9,7 +10,7 @@ from db import get_connection
 from urllib.parse import urlparse
 
 from mapping_engine import MappingEngine
-from scraper import crawl_vendor_site
+from scraper import WORD_CAP, crawl_vendor_site
 
 from db import (
     approve_pending_use_case,
@@ -25,6 +26,19 @@ load_dotenv(os.path.join(os.path.dirname(__file__), "..", ".env"))
 app = Flask(__name__)
 CORS(app)
 mapping_engine = MappingEngine()
+MIN_WORDS_FOR_EVAL = 75
+
+
+def to_utc_iso(dt):
+    """
+    schema.sql columns are TIMESTAMP (no tz) and Neon's session timezone is
+    UTC, so psycopg2 hands back naive datetimes that are secretly UTC. Without
+    a 'Z'/offset, JS Date() parses an ISO string as local time instead of UTC,
+    silently shifting every displayed timestamp by the browser's UTC offset.
+    """
+    if dt is None:
+        return None
+    return dt.replace(tzinfo=timezone.utc).isoformat()
 
 
 @app.errorhandler(404)
@@ -126,18 +140,55 @@ def evaluate():
         return jsonify({"error": f"Unknown domain code '{domain_code}'"}), 400
     domain_id = domain_row[0]
 
+    paste_text_suggestion = (
+        "Try paste-text mode instead: paste the vendor's product page content or "
+        "marketing copy directly."
+    )
+
     pages_crawled = None
+    warnings = []
     if input_type == "url":
         try:
             crawl_result = crawl_vendor_site(input_value, max_pages=8)
         except Exception as exc:
-            return jsonify({"error": f"Failed to crawl URL: {exc}"}), 502
+            return jsonify(
+                {"error": f"Failed to crawl URL: {exc}", "suggestion": paste_text_suggestion}
+            ), 502
         vendor_text = crawl_result["text"]
         pages_crawled = crawl_result["pages_crawled"]
         if not vendor_text.strip():
-            return jsonify({"error": "Crawl succeeded but no usable text was found on the site"}), 422
+            return jsonify(
+                {
+                    "error": (
+                        "Could not extract any usable text from this site. It may be "
+                        "blocking crawlers, returning errors on every page, or have no "
+                        "crawlable content."
+                    ),
+                    "suggestion": paste_text_suggestion,
+                }
+            ), 502
     else:
         vendor_text = input_value
+        words = vendor_text.split()
+        if len(words) > WORD_CAP:
+            vendor_text = " ".join(words[:WORD_CAP])
+            warnings.append(
+                f"Pasted text was truncated to the first {WORD_CAP} words to keep "
+                "evaluation focused and within LLM limits."
+            )
+
+    word_count = len(vendor_text.split())
+    if word_count < MIN_WORDS_FOR_EVAL:
+        if input_type == "url":
+            warnings.append(
+                f"Only {word_count} words of usable text were found across "
+                f"{pages_crawled} page(s). Results may be less accurate — {paste_text_suggestion.lower()}"
+            )
+        else:
+            warnings.append(
+                f"Only {word_count} words of text were provided. Results may be less "
+                "accurate — try pasting more detailed product or marketing copy."
+            )
 
     with get_connection() as conn:
         with conn.cursor() as cur:
@@ -228,10 +279,11 @@ def evaluate():
                 "input_type": input_type,
                 "pages_crawled": pages_crawled,
                 "word_count": len(vendor_text.split()),
-                "created_at": created_at.isoformat(),
+                "created_at": to_utc_iso(created_at),
             },
             "mapping": reconciled,
             "new_use_cases_found": new_use_cases_found,
+            "warnings": warnings,
         }
     ), 201
 
@@ -267,7 +319,7 @@ def list_vendors():
             "name": row[1],
             "input_type": row[2],
             "pages_crawled": row[3],
-            "created_at": row[4].isoformat(),
+            "created_at": to_utc_iso(row[4]),
             "domain_code": row[5],
             "use_cases_total": row[6],
             "use_cases_covered": row[7],
@@ -325,7 +377,7 @@ def get_vendor(vendor_id):
         "name": vendor_row[1],
         "input_type": vendor_row[2],
         "pages_crawled": vendor_row[3],
-        "created_at": vendor_row[4].isoformat(),
+        "created_at": to_utc_iso(vendor_row[4]),
         "domain_code": vendor_row[5],
         "mapping": [
             {
@@ -428,7 +480,7 @@ def list_pending_use_cases():
     domain_code = request.args.get("domain")
     pending = get_pending_use_cases(domain_code)
     for row in pending:
-        row["created_at"] = row["created_at"].isoformat() if row["created_at"] else None
+        row["created_at"] = to_utc_iso(row["created_at"])
     return jsonify(pending)
 
 
