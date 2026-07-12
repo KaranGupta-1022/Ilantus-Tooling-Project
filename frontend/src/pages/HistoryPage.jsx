@@ -1,3 +1,8 @@
+/**
+ * Table of previously evaluated vendors, filterable by IAM domain. "View
+ * Results" re-fetches the full evaluation for a vendor and reuses
+ * ResultsPage to display it.
+ */
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getDomains, getVendors, getVendor } from '../api.js'
@@ -37,6 +42,7 @@ export default function HistoryPage() {
       .catch(() => {})
   }, [])
 
+  // Refetch the vendor list whenever the domain filter changes.
   useEffect(() => {
     setLoading(true)
     setError(null)
@@ -48,6 +54,12 @@ export default function HistoryPage() {
 
   const filteredVendors = useMemo(() => vendors, [vendors])
 
+  /**
+   * - Fetches GET /vendors/{id} for full mapping detail (the list endpoint
+   *   only returns summary fields), then reshapes it into the same
+   *   { vendor, mapping, new_use_cases_found } shape ResultsPage expects
+   *   from a fresh evaluation, and navigates there with it.
+   */
   async function handleViewResults(vendor) {
     setViewLoadingId(vendor.id)
     try {

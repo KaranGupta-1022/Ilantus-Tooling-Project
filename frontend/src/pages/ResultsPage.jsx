@@ -1,6 +1,17 @@
+/**
+ * Shows the outcome of a single vendor evaluation: coverage summary,
+ * per-category breakdown, the full use case mapping table, and any new
+ * use cases the LLM discovered (pending human review). Reads the result
+ * from router state, so it only renders after a navigation from HomePage
+ * or HistoryPage's "View Results" action.
+ */
 import { useLocation } from 'react-router-dom'
 import ScrollBox from '../components/ScrollBox.jsx'
 
+/**
+ * - Groups mapping rows by category and tallies covered vs. total per group.
+ * - Returns an array (not a map) so it can be rendered directly via .map().
+ */
 function buildCategoryBreakdown(mapping) {
   const byCategory = {}
   for (const item of mapping) {
@@ -17,12 +28,14 @@ function buildCategoryBreakdown(mapping) {
   }))
 }
 
+// API returns confidence as a 0.0-1.0 float; display it as a rounded percentage.
 function formatConfidence(confidence) {
   return confidence == null ? '—' : `${Math.round(confidence * 100)}%`
 }
 
 export default function ResultsPage() {
   const location = useLocation()
+  // Populated by navigate('/results', { state: { result } }) from HomePage or HistoryPage.
   const result = location.state?.result
 
   if (!result) {
@@ -128,6 +141,8 @@ export default function ResultsPage() {
         </ScrollBox>
       </div>
 
+      {/* new_use_cases_found comes from the discovery pass in mapping_engine.py;
+          field names (suggested_*, llm_reasoning) mirror the pending_use_cases table. */}
       {newUseCases && newUseCases.length > 0 && (
         <div className="card new-use-cases-card">
           <div className="new-use-cases-header">

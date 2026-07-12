@@ -1,3 +1,12 @@
+/**
+ * Use case library browser with two tabs:
+ * - Master Library: approved use cases, searchable/filterable/paginated,
+ *   fetched per-domain (or across all domains) via GET /use-cases.
+ * - Pending Review: LLM-discovered use cases awaiting a human decision,
+ *   with inline edit and approve/reject actions (PATCH/POST against
+ *   /pending-use-cases). Approving a pending item also refreshes the
+ *   master list since it becomes part of it.
+ */
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   getDomains,
@@ -58,6 +67,12 @@ export default function LibraryPage() {
       .catch(() => {})
   }, [])
 
+  /**
+   * - GET /use-cases only accepts a single domain, so "All Domains" fans out
+   *   one request per known domain and flattens the results.
+   * - Stamps domain_code onto each item client-side since the per-domain
+   *   endpoint response doesn't otherwise carry it.
+   */
   async function loadMaster() {
     setMasterLoading(true)
     setMasterError(null)
@@ -133,6 +148,7 @@ export default function LibraryPage() {
     })
   }, [pendingList, pendingSearch])
 
+  // Opens the inline edit form for a pending item, seeded with its current values.
   function startEdit(item) {
     setEditingId(item.id)
     setEditDraft({ ...item })
@@ -144,6 +160,7 @@ export default function LibraryPage() {
     setEditDraft(null)
   }
 
+  // PATCHes the edited fields, then applies the same edit locally rather than refetching the list.
   async function saveEdit() {
     setActionLoadingId(editDraft.id)
     setActionError(null)
@@ -166,6 +183,7 @@ export default function LibraryPage() {
     }
   }
 
+  // Approving moves the item out of pending and into the master library, so both lists need updating.
   async function approve(item) {
     setActionLoadingId(item.id)
     setActionError(null)

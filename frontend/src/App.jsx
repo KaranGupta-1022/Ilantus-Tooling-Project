@@ -1,3 +1,7 @@
+/**
+ * Route table. Maps each top-level page to a URL path, nested under
+ * the shared Layout shell (sidebar + content area).
+ */
 import { Routes, Route } from 'react-router-dom'
 import Layout from './components/Layout.jsx'
 import HomePage from './pages/HomePage.jsx'

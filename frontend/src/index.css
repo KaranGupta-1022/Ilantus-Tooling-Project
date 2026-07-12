@@ -1,3 +1,4 @@
+/* --- Reset & base --- */
 * {
   box-sizing: border-box;
 }
@@ -13,6 +14,7 @@ h1 {
   margin-top: 0;
 }
 
+/* --- App shell & sidebar --- */
 .app-shell {
   display: flex;
   min-height: 100vh;
@@ -99,6 +101,7 @@ h1 {
   padding: 32px;
 }
 
+/* --- Status colors & badges --- */
 .status-covered {
   color: #16a34a;
 }
@@ -143,6 +146,7 @@ h1 {
   margin-bottom: 24px;
 }
 
+/* --- Cards & home page --- */
 .card {
   background: #fff;
   border: 1px solid #e2e8f0;
@@ -172,6 +176,7 @@ h1 {
   font-size: 40px;
 }
 
+/* --- Forms & inputs --- */
 .form-group {
   display: flex;
   flex-direction: column;
@@ -236,6 +241,7 @@ h1 {
   font-weight: 600;
 }
 
+/* --- Buttons --- */
 .btn-primary {
   padding: 12px 20px;
   border: none;
@@ -252,6 +258,7 @@ h1 {
   cursor: not-allowed;
 }
 
+/* --- Loading spinner --- */
 .loading-box {
   margin-top: 16px;
   display: flex;
@@ -287,6 +294,7 @@ h1 {
   }
 }
 
+/* --- Dropdown menus --- */
 .dropdown {
   position: relative;
 }
@@ -363,6 +371,7 @@ h1 {
   font-weight: 600;
 }
 
+/* --- Results page --- */
 .results-header {
   display: flex;
   justify-content: space-between;
@@ -524,6 +533,7 @@ h1 {
   z-index: 1;
 }
 
+/* --- ScrollBox custom scrollbars --- */
 .scroll-box-wrap {
   position: relative;
   margin-right: -20px;
@@ -600,6 +610,7 @@ h1 {
   padding: 24px;
 }
 
+/* --- History page --- */
 .badge-coverage {
   display: inline-block;
   padding: 3px 10px;
@@ -639,6 +650,7 @@ h1 {
   background: #f8fafc;
 }
 
+/* --- Compare page --- */
 .compare-chip-row {
   display: flex;
   flex-wrap: wrap;
@@ -752,6 +764,7 @@ h1 {
   padding: 0;
 }
 
+/* --- Library page --- */
 .tab-row {
   display: flex;
   gap: 4px;
@@ -932,6 +945,7 @@ h1 {
   cursor: pointer;
 }
 
+/* --- Pagination --- */
 .pagination-row {
   display: flex;
   align-items: center;
@@ -971,6 +985,7 @@ h1 {
   cursor: not-allowed;
 }
 
+/* --- Responsive / mobile --- */
 .mobile-topbar {
   display: none;
 }

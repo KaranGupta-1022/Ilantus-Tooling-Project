@@ -1,3 +1,8 @@
+/**
+ * Side-by-side use case coverage comparison for 2+ vendors within a single
+ * IAM domain. Vendors must share a domain because the comparison is
+ * use-case-by-use-case, and use cases are domain-scoped.
+ */
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { getDomains, getVendors, compareVendors } from '../api.js'
 import ScrollBox from '../components/ScrollBox.jsx'
@@ -38,6 +43,7 @@ export default function ComparePage() {
       .catch(() => {})
   }, [])
 
+  // Changing domain resets vendor selection, since vendors from other domains no longer apply.
   useEffect(() => {
     setVendorsLoading(true)
     setVendorsError(null)
@@ -48,6 +54,7 @@ export default function ComparePage() {
       .finally(() => setVendorsLoading(false))
   }, [domainCode])
 
+  // Comparison only makes sense with 2+ vendors selected; calls GET /compare?ids=1,2,3.
   useEffect(() => {
     if (selectedIds.length < 2) {
       setCompareData(null)
@@ -77,6 +84,14 @@ export default function ComparePage() {
     setSelectedIds(selectedIds.filter((sid) => sid !== id))
   }
 
+  /**
+   * - Pivots the API's per-vendor mapping arrays into per-use-case rows
+   *   (one row per use case, one cell per vendor) for the comparison table.
+   * - Uses the first vendor's mapping as the row list, since all vendors in
+   *   a domain are evaluated against the same use case set.
+   * - Flags a row as "differs" when vendors disagree on coverage, so it can
+   *   be highlighted in the table.
+   */
   const useCaseRows = useMemo(() => {
     if (!compareData || compareData.vendors.length === 0) return []
     const first = compareData.vendors[0].mapping

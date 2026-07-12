@@ -1,3 +1,8 @@
+/**
+ * Scrollable container with custom (non-native) vertical/horizontal
+ * scrollbar thumbs, used to wrap tables and lists so their scrollbars match
+ * the app's styling instead of the browser default.
+ */
 import { useEffect, useRef, useState } from 'react'
 
 export default function ScrollBox({ maxHeight, wrapClassName = '', children }) {
@@ -5,6 +10,12 @@ export default function ScrollBox({ maxHeight, wrapClassName = '', children }) {
   const [vThumb, setVThumb] = useState({ height: 0, top: 0, visible: false })
   const [hThumb, setHThumb] = useState({ width: 0, left: 0, visible: false })
 
+  /**
+   * - Recomputes custom scrollbar thumb size/position from the real
+   *   scroll/client dimensions of the inner container.
+   *   - height/width are floored at 24px so a small thumb stays clickable.
+   *   - Marks a thumb not visible when content doesn't overflow that axis.
+   */
   function updateThumbs() {
     const el = containerRef.current
     if (!el) return
@@ -31,10 +42,12 @@ export default function ScrollBox({ maxHeight, wrapClassName = '', children }) {
     }
   }
 
+  // Re-measure whenever the scrolled content changes (e.g. table rows load in).
   useEffect(() => {
     updateThumbs()
   }, [children])
 
+  // Re-measure on container resize (e.g. window resize, layout shifts).
   useEffect(() => {
     const el = containerRef.current
     if (!el || typeof ResizeObserver === 'undefined') return

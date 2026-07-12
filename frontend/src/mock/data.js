@@ -1,3 +1,4 @@
+// Legacy mock data used before pages were wired to the real Flask API. Unused since then.
 export const mockDomains = [
     { id: 1, code: 'IGA', name: 'Identity Governance and Administration', description: 'Access lifecycle, certification, provisioning, and compliance for enterprise applications.' },
     { id: 2, code: 'PAM', name: 'Privileged Access Management', description: 'Vaulting, session management, and just-in-time elevation for privileged accounts.' },

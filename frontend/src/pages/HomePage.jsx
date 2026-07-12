@@ -1,3 +1,8 @@
+/**
+ * Landing page: form to submit a vendor (by URL or pasted text) for
+ * evaluation against an IAM domain's use case library, then navigates to
+ * ResultsPage with the API response.
+ */
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getDomains, evaluateVendor } from '../api.js'
@@ -8,7 +13,7 @@ export default function HomePage() {
   const [domainCode, setDomainCode] = useState('IGA')
   const [inputType, setInputType] = useState('url')
   const [inputValue, setInputValue] = useState('')
-  const [loadingStage, setLoadingStage] = useState(null) // null | 'crawling' | 'evaluating'
+  const [loadingStage, setLoadingStage] = useState(null) // null | 'crawling' | 'evaluating' — drives the two-step loading message below
   const [domainOpen, setDomainOpen] = useState(false)
   const domainRef = useRef(null)
 
@@ -26,12 +31,20 @@ export default function HomePage() {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
+  // Load available IAM domains for the dropdown on mount.
   useEffect(() => {
     getDomains()
       .then((data) => setDomains(data))
       .catch((err) => setDomainsError(err.message))
   }, [])
 
+  /**
+   * - Validates the form, then calls POST /evaluate (crawl + Groq mapping).
+   * - For URL input, shows "Crawling…" first and flips to "Evaluating…"
+   *   after 4s (a rough estimate — the crawl and LLM call are actually one
+   *   sequential request) so the user isn't staring at one static message.
+   * - On success, navigates to /results passing the API result via router state.
+   */
   async function handleSubmit(e) {
     e.preventDefault()
     setSubmitError(null)
