@@ -20,8 +20,9 @@ from db import (
     update_pending_use_case,
 )
 
-
 load_dotenv(os.path.join(os.path.dirname(__file__), "..", ".env"))
+
+MAX_CRAWL_PAGES = int(os.environ.get("MAX_CRAWL_PAGES", "8"))
 
 app = Flask(__name__)
 CORS(app)
@@ -149,7 +150,7 @@ def evaluate():
     warnings = []
     if input_type == "url":
         try:
-            crawl_result = crawl_vendor_site(input_value, max_pages=8)
+            crawl_result = crawl_vendor_site(input_value, max_pages=MAX_CRAWL_PAGES)
         except Exception as exc:
             return jsonify(
                 {"error": f"Failed to crawl URL: {exc}", "suggestion": paste_text_suggestion}

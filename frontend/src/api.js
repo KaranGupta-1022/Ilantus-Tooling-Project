@@ -1,12 +1,13 @@
 /**
  * Axios client for the Flask backend and one function per REST endpoint.
- * baseURL is a relative '/api' path — Vite's dev server proxies it to
- * Flask on :5000 (see vite.config.js), so no absolute host is needed.
+ * baseURL is '/api' in dev (Vite's dev server proxies it to Flask on :5000,
+ * see vite.config.js) or VITE_API_URL in production (set on Vercel to the
+ * live Render backend URL, since there's no dev proxy in a static build).
  */
 import axios from 'axios'
 
 const api = axios.create({
-  baseURL: '/api',
+  baseURL: import.meta.env.VITE_API_URL || '/api',
   // Generous timeout: /evaluate does a live site crawl plus a Groq LLM call,
   // both of which can take much longer than a typical API request.
   timeout: 60000,
