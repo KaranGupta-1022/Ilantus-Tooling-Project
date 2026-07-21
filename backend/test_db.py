@@ -1,6 +1,11 @@
+import os
+
+import pytest
+
 from db import get_connection
 
 
+@pytest.mark.skipif(not os.getenv("DATABASE_URL"), reason="DATABASE_URL not set")
 def test_connection_and_query():
     """
     Tests the database connection and query.

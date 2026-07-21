@@ -5,8 +5,6 @@ from dotenv import load_dotenv
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 
-from db import get_connection
-
 from urllib.parse import urlparse
 
 from mapping_engine import MappingEngine
