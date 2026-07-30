@@ -166,9 +166,4 @@ entirely and is the more reliable option for live demos.
 
 ## License
 
-MIT
-
-## Contact
-
-Karan Gupta — [karangu1022@gmail.com](mailto:karangu1022@gmail.com) —
-[github.com/KaranGupta-1022](https://github.com/KaranGupta-1022)
+MIT — see [LICENSE](LICENSE). Questions or feedback: [@KaranGupta-1022](https://github.com/KaranGupta-1022)
