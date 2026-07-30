@@ -18,8 +18,6 @@ review before folding approved ones back into the library for future evaluations
 
 ![Demo](docs/demo.gif)
 
-*(placeholder — record per the shot list below and drop the GIF at `docs/demo.gif`)*
-
 **Live app:** https://ilantus-tooling-project.vercel.app/
 **Live API:** https://ilantus-tooling-project.onrender.com/api/health
 
