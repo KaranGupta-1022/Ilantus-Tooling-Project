@@ -8,7 +8,7 @@
 ![Render](https://img.shields.io/badge/Backend-Render-46E3B7?logo=render&logoColor=white)
 
 A full-stack tool that evaluates an IAM (Identity and Access Management) vendor's
-product — from a website URL or pasted text — against a domain-scoped library of
+product, from a website URL or pasted text, against a domain-scoped library of
 use cases, using the Groq API as the LLM backend. It returns a structured gap
 analysis of what the vendor covers, automatically discovers vendor capabilities
 that represent new use cases not yet in the library, and queues them for human
